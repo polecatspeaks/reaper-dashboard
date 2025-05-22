@@ -95,7 +95,7 @@ This project is licensed under the **GNU General Public License v3.0** — see t
 
 ## Contact
 
-Christopher Mann — [GitHub](https://github.com/polecatspeaks) — [Email](mailto:mannchristophers@gmail.com)  
+Zee  — [GitHub](https://github.com/polecatspeaks) 
 
 ---
 
