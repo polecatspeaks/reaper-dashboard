@@ -1,3 +1,14 @@
+#!/bin/bash
+set -e
+
+echo "Creating README.md, LICENSE, GitHub issue and PR templates, and adding logo..."
+
+mkdir -p .github/ISSUE_TEMPLATE
+mkdir -p .github/PULL_REQUEST_TEMPLATE
+mkdir -p assets
+
+# README.md
+cat > README.md << 'EOF'
 # REAPER — RPG Encounter and Adventure Preparedness Engine for Roleplaying
 
 ![REAPER Logo](./assets/reaper-logo.svg)
