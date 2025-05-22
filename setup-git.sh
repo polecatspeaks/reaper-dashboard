@@ -1,17 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "Creating README.md, LICENSE, GitHub issue and PR templates, and adding logo..."
+echo "Fixing README.md logo path and ensuring full content..."
 
-mkdir -p .github/ISSUE_TEMPLATE
-mkdir -p .github/PULL_REQUEST_TEMPLATE
-mkdir -p assets
-
-# README.md
 cat > README.md << 'EOF'
 # REAPER — RPG Encounter and Adventure Preparedness Engine for Roleplaying
 
-![REAPER Logo](./assets/reaper-logo.svg)
+![REAPER Logo](./assets/reaper-logo.png)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![GitHub issues](https://img.shields.io/github/issues/polecatspeaks/reaper-dashboard)](https://github.com/polecatspeaks/reaper-dashboard/issues)
