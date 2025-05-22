@@ -49,24 +49,18 @@ convenience to classic pen-and-paper adventures.
 
 1. Clone the repo:
 
-   ```bash
    git clone https://github.com/polecatspeaks/reaper-dashboard.git
-   cd reaper-dashboard
+   cd reaper-dashboard```
 2. Install dependencies:
 
-```bash
-npm install
-Start the backend server (map extraction API):
-
-```bash
-cd backend
-node server.js
-Start the frontend app:
-
-```bash
-cd ..
-npm start
-Open http://localhost:3000 in your browser.
+  npm install
+  Start the backend server (map extraction API):
+  cd backend
+  node server.js
+  Start the frontend app:
+  cd ..
+  npm start
+  Open http://localhost:3000 in your browser.
 
 ## Usage
 
