@@ -112,3 +112,70 @@ export default function SceneManager() {
           key={scene.id}
           style={{
             marginBottom: 30,
+            padding: 10,
+            border: '1px solid #ccc',
+            borderRadius: 6,
+          }}
+        >
+          <h3>{scene.name}</h3>
+          <label>
+            Assign Maps (hold Ctrl/Cmd to multi-select):
+            <br />
+            <select
+              multiple
+              size={Math.min(5, maps.length)}
+              style={{ width: '100%', marginTop: 8 }}
+              value={assignments[scene.id] || []}
+              onChange={e => onMapSelect(scene.id, e.target.selectedOptions)}
+            >
+              {maps.map(map => (
+                <option key={map.id} value={map.id}>
+                  {map.filename || map.id}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div
+            style={{
+              marginTop: 10,
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            {(assignments[scene.id] || []).map(mapId => {
+              const map = maps.find(m => m.id === mapId);
+              if (!map) return null;
+              return (
+                <img
+                  key={mapId}
+                  src={`/maps/${map.filename || map.id}`}
+                  alt={map.filename || 'map'}
+                  style={{ maxHeight: 100, border: '1px solid #aaa', borderRadius: 4 }}
+                />
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => saveAssignments(scene.id)}
+            disabled={uploading}
+            style={{
+              marginTop: 10,
+              padding: '8px 16px',
+              backgroundColor: '#0a74da',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer'
+            }}
+          >
+            Save Maps
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+

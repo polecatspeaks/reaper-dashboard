@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
-const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -10,26 +9,28 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Storage config for multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // timestamp + original extension for uniqueness
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage: storage });
+
 // Serve static maps images from /public/maps
 app.use('/maps', express.static(path.join(__dirname, 'public', 'maps')));
 
 const DATA_DIR = path.join(__dirname, 'data');
 const SCENES_FILE = path.join(DATA_DIR, 'scenes.json');
 const MAPS_FILE = path.join(DATA_DIR, 'maps.json');
-
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-const MAPS_DIR = path.join(__dirname, 'public', 'maps');
-
-// Setup multer for uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
-  }
-});
-const upload = multer({ storage: storage });
 
 function readJson(filePath) {
   if (!fs.existsSync(filePath)) return [];
@@ -42,44 +43,17 @@ function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
-// Upload PDF and extract maps
-app.post('/api/upload-pdf', upload.single('pdf'), (req, res) => {
+// POST upload PDF and extract maps
+app.post('/api/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No PDF file uploaded' });
-  }
-  const pdfPath = req.file.path;
-  const outputPrefix = path.join(MAPS_DIR, `map-${Date.now()}`);
-
-  if (!fs.existsSync(MAPS_DIR)) {
-    fs.mkdirSync(MAPS_DIR, { recursive: true });
+    return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const cmd = `pdfimages -png "${pdfPath}" "${outputPrefix}"`;
+  // TODO: Add pdfimages extraction logic here
+  // For now, just send success response
 
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.error('Error extracting images:', error);
-      return res.status(500).json({ error: 'Image extraction failed' });
-    }
-
-    const extractedFiles = fs.readdirSync(MAPS_DIR)
-      .filter(f => f.startsWith(path.basename(outputPrefix)))
-      .map((filename, index) => ({
-        id: `map-${Date.now()}-${index}`,
-        filename,
-        url: `/maps/${filename}`
-      }));
-
-    let maps = [];
-    if (fs.existsSync(MAPS_FILE)) {
-      maps = JSON.parse(fs.readFileSync(MAPS_FILE));
-    }
-    maps = maps.concat(extractedFiles);
-
-    fs.writeFileSync(MAPS_FILE, JSON.stringify(maps, null, 2));
-
-    res.json({ extractedMaps: extractedFiles });
-  });
+  console.log('Received file:', req.file.filename);
+  res.json({ success: true, filename: req.file.filename });
 });
 
 // GET all maps

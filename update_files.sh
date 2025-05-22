@@ -1,201 +1,137 @@
 #!/bin/bash
 set -e
 
-PATCH_FILE="scene-manager-improvements.patch"
+SERVER_PATH="backend/server.js"
+BACKUP_PATH="backend/server.js.bak"
 
-cat > "$PATCH_FILE" << 'EOF'
-diff --git a/src/pages/SceneManager.jsx b/src/pages/SceneManager.jsx
-new file mode 100644
-index 0000000..a0b3a3e
---- /dev/null
-+++ b/src/pages/SceneManager.jsx
-@@ -0,0 +1,114 @@
-+import React, { useState, useEffect } from 'react';
-+
-+export default function SceneManager() {
-+  const [scenes, setScenes] = useState([]);
-+  const [maps, setMaps] = useState([]);
-+  const [assignments, setAssignments] = useState({}); // sceneId => [mapIds]
-+  const [uploading, setUploading] = useState(false);
-+  const [dragOver, setDragOver] = useState(false);
-+
-+  useEffect(() => {
-+    fetch('/api/scenes')
-+      .then(res => res.json())
-+      .then(data => {
-+        setScenes(data);
-+        const init = {};
-+        data.forEach(scene => {
-+          init[scene.id] = (scene.assignedMaps || []).map(m => m.id);
-+        });
-+        setAssignments(init);
-+      });
-+    fetch('/api/maps')
-+      .then(res => res.json())
-+      .then(setMaps);
-+  }, []);
-+
-+  function onMapSelect(sceneId, selectedOptions) {
-+    const selectedIds = Array.from(selectedOptions).map(o => o.value);
-+    setAssignments(prev => ({ ...prev, [sceneId]: selectedIds }));
-+  }
-+
-+  async function saveAssignments(sceneId) {
-+    setUploading(true);
-+    try {
-+      const res = await fetch(`/api/scenes/${sceneId}/maps`, {
-+        method: 'POST',
-+        headers: { 'Content-Type': 'application/json' },
-+        body: JSON.stringify({ mapIds: assignments[sceneId] || [] }),
-+      });
-+      if (!res.ok) throw new Error('Failed to save');
-+      const updatedScene = await res.json();
-+      setScenes(prev =>
-+        prev.map(s => (s.id === sceneId ? updatedScene : s))
-+      );
-+      alert('Maps saved!');
-+    } catch (e) {
-+      alert('Error saving maps: ' + e.message);
-+    } finally {
-+      setUploading(false);
-+    }
-+  }
-+
-+  async function onDrop(event) {
-+    event.preventDefault();
-+    setDragOver(false);
-+    const files = event.dataTransfer.files;
-+    if (!files.length) return;
-+    await uploadPdf(files[0]);
-+  }
-+
-+  async function uploadPdf(file) {
-+    const formData = new FormData();
-+    formData.append('file', file);
-+    setUploading(true);
-+    try {
-+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-+      if (!res.ok) throw new Error('Upload failed');
-+      alert('PDF uploaded and maps extracted!');
-+      const mapsRes = await fetch('/api/maps');
-+      const newMaps = await mapsRes.json();
-+      setMaps(newMaps);
-+      const scenesRes = await fetch('/api/scenes');
-+      const newScenes = await scenesRes.json();
-+      setScenes(newScenes);
-+    } catch (e) {
-+      alert('Error uploading PDF: ' + e.message);
-+    } finally {
-+      setUploading(false);
-+    }
-+  }
-+
-+  return (
-+    <div
-+      onDragOver={e => {
-+        e.preventDefault();
-+        setDragOver(true);
-+      }}
-+      onDragLeave={e => {
-+        e.preventDefault();
-+        setDragOver(false);
-+      }}
-+      onDrop={onDrop}
-+      style={{
-+        padding: 20,
-+        backgroundColor: dragOver ? '#f0f8ff' : 'transparent',
-+        border: dragOver ? '2px dashed #0a74da' : '2px dashed transparent',
-+        marginBottom: 20,
-+      }}
-+    >
-+      <p>Drag & drop a chapter PDF here or use the file input below to upload and extract maps:</p>
-+      <input
-+        type="file"
-+        accept=".pdf"
-+        disabled={uploading}
-+        onChange={e => e.target.files.length && uploadPdf(e.target.files[0])}
-+      />
-+      {uploading && <p>Uploading and extracting maps...</p>}
-+
-+      <h2>Scenes</h2>
-+
-+      {scenes.map(scene => (
-+        <div
-+          key={scene.id}
-+          style={{
-+            marginBottom: 30,
-+            padding: 10,
-+            border: '1px solid #ccc',
-+            borderRadius: 6,
-+          }}
-+        >
-+          <h3>{scene.name}</h3>
-+          <label>
-+            Assign Maps (hold Ctrl/Cmd to multi-select):
-+            <br />
-+            <select
-+              multiple
-+              size={Math.min(5, maps.length)}
-+              style={{ width: '100%', marginTop: 8 }}
-+              value={assignments[scene.id] || []}
-+              onChange={e => onMapSelect(scene.id, e.target.selectedOptions)}
-+            >
-+              {maps.map(map => (
-+                <option key={map.id} value={map.id}>
-+                  {map.filename || map.id}
-+                </option>
-+              ))}
-+            </select>
-+          </label>
-+
-+          <div
-+            style={{
-+              marginTop: 10,
-+              display: 'flex',
-+              gap: 10,
-+              flexWrap: 'wrap',
-+            }}
-+          >
-+            {(assignments[scene.id] || []).map(mapId => {
-+              const map = maps.find(m => m.id === mapId);
-+              if (!map) return null;
-+              return (
-+                <img
-+                  key={mapId}
-+                  src={`/maps/${map.filename || map.id}`}
-+                  alt={map.filename || 'map'}
-+                  style={{ maxHeight: 100, border: '1px solid #aaa', borderRadius: 4 }}
-+                />
-+              );
-+            })}
-+          </div>
-+
-+          <button
-+            onClick={() => saveAssignments(scene.id)}
-+            disabled={uploading}
-+            style={{
-+              marginTop: 10,
-+              padding: '8px 16px',
-+              backgroundColor: '#0a74da',
-+              color: '#fff',
-+              border: 'none',
-+              borderRadius: 4,
-+              cursor: 'pointer',
-+            }}
-+          >
-+            Save Maps
-+          </button>
-+        </div>
-+      ))}
-+    </div>
-+  );
-+}
+echo "Backing up existing server.js if it exists..."
+if [ -f "$SERVER_PATH" ]; then
+  cp "$SERVER_PATH" "$BACKUP_PATH"
+  echo "Backup saved to $BACKUP_PATH"
+else
+  echo "No existing server.js found, skipping backup."
+fi
+
+echo "Writing new server.js..."
+
+mkdir -p backend
+
+cat > "$SERVER_PATH" << 'EOF'
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+// Storage config for multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // timestamp + original extension for uniqueness
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage: storage });
+
+// Serve static maps images from /public/maps
+app.use('/maps', express.static(path.join(__dirname, 'public', 'maps')));
+
+const DATA_DIR = path.join(__dirname, 'data');
+const SCENES_FILE = path.join(DATA_DIR, 'scenes.json');
+const MAPS_FILE = path.join(DATA_DIR, 'maps.json');
+
+function readJson(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const data = fs.readFileSync(filePath);
+  return JSON.parse(data);
+}
+
+function writeJson(filePath, data) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+// POST upload PDF and extract maps
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  // TODO: Add pdfimages extraction logic here
+  // For now, just send success response
+
+  console.log('Received file:', req.file.filename);
+  res.json({ success: true, filename: req.file.filename });
+});
+
+// GET all maps
+app.get('/api/maps', (req, res) => {
+  const maps = readJson(MAPS_FILE);
+  res.json(maps);
+});
+
+// GET all scenes
+app.get('/api/scenes', (req, res) => {
+  const scenes = readJson(SCENES_FILE);
+  res.json(scenes);
+});
+
+// POST assign maps to a scene (replace assignedMaps)
+app.post('/api/scenes/:sceneId/maps', (req, res) => {
+  const { sceneId } = req.params;
+  const { mapIds } = req.body;
+
+  if (!Array.isArray(mapIds)) {
+    return res.status(400).json({ error: 'mapIds must be an array' });
+  }
+
+  const scenes = readJson(SCENES_FILE);
+  const maps = readJson(MAPS_FILE);
+
+  const scene = scenes.find((s) => s.id === sceneId);
+  if (!scene) return res.status(404).json({ error: 'Scene not found' });
+
+  const validMaps = mapIds.filter((id) => maps.some((m) => m.id === id));
+
+  scene.assignedMaps = validMaps.map((id) => maps.find((m) => m.id === id));
+
+  writeJson(SCENES_FILE, scenes);
+
+  res.json(scene);
+});
+
+// DELETE a map assignment from a scene
+app.delete('/api/scenes/:sceneId/maps/:mapId', (req, res) => {
+  const { sceneId, mapId } = req.params;
+
+  const scenes = readJson(SCENES_FILE);
+  const scene = scenes.find((s) => s.id === sceneId);
+
+  if (!scene) return res.status(404).json({ error: 'Scene not found' });
+
+  scene.assignedMaps = (scene.assignedMaps || []).filter((m) => m.id !== mapId);
+
+  writeJson(SCENES_FILE, scenes);
+
+  res.json(scene);
+});
+
+const PORT = 4000;
+app.listen(PORT, () => {
+  console.log(`REAPER backend running on port ${PORT}`);
+});
 EOF
 
-echo "Applying patch $PATCH_FILE..."
-git apply "$PATCH_FILE"
-echo "Patch applied successfully."
-
-rm "$PATCH_FILE"
-echo "Temporary patch file removed."
+echo "New server.js written successfully!"
 
