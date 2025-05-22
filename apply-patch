@@ -1,0 +1,10 @@
+#!/bin/bash
+BASE_BRANCH=main
+PATCH_NAME=scene-manager-fix.patch
+
+git diff $BASE_BRANCH..HEAD > $PATCH_NAME
+dos2unix $PATCH_NAME
+
+echo "Patch created: $PATCH_NAME"
+echo "Test with: git apply --check $PATCH_NAME"
+

@@ -1,218 +1,201 @@
 #!/bin/bash
 set -e
 
-echo "Fixing DmModule.jsx: restore PDF upload UI with map assignments overview and export..."
+PATCH_FILE="scene-manager-improvements.patch"
 
-mkdir -p src/pages
-
-cat > src/pages/DmModule.jsx << 'EOF'
-import React, { useState } from 'react';
-import useDmModuleStore from '../store/dmModuleStore';
-import useSceneStore from '../store/sceneStore';
-import useCombatStore from '../store/combatStore';
-
-const DmModule = () => {
-  const {
-    campaignNotes,
-    sceneNotes,
-    combatNotes,
-    chapterInfo,
-    sceneMapAssignments = {},
-    setCampaignNotes,
-    setSceneNotes,
-    setCombatNotes,
-    setSceneMapAssignments,
-  } = useDmModuleStore();
-
-  const { scenes } = useSceneStore();
-  const { combatants } = useCombatStore();
-
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [extractedMaps, setExtractedMaps] = useState([]);
-  const [exportJson, setExportJson] = useState('');
-
-  // Upload PDF and extract maps
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
-  };
-
-  const uploadPdf = async () => {
-    if (!selectedFile) return alert('Please select a PDF file first.');
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('pdf', selectedFile);
-
-    try {
-      const response = await fetch('http://localhost:4000/extract-maps', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Upload failed');
-
-      const data = await response.json();
-      setExtractedMaps(data.maps);
-      // Add new extracted maps to assignments (optional, or manage separately)
-      // For now just show them here; assign in SceneManager
-    } catch (error) {
-      alert('Error uploading or extracting maps: ' + error.message);
-    } finally {
-      setUploading(false);
-      setSelectedFile(null);
-    }
-  };
-
-  const handleExport = () => {
-    const exportData = {
-      sceneMapAssignments,
-      campaignNotes,
-      sceneNotes,
-      combatNotes,
-      chapterInfo,
-    };
-    setExportJson(JSON.stringify(exportData, null, 2));
-  };
-
-  const handleClearExport = () => {
-    setExportJson('');
-  };
-
-  return (
-    <div className="bg-parchment text-ink p-6 min-h-screen max-w-6xl mx-auto">
-      <h1 className="text-4xl font-bold mb-6">🛡️ DM Module Dashboard</h1>
-
-      {/* Chapter Info */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Chapter Info</h2>
-        <h3 className="font-bold text-xl mb-2">{chapterInfo.title}</h3>
-        <p className="mb-4 whitespace-pre-line">{chapterInfo.summary}</p>
-        <blockquote className="italic text-sm text-gray-700">“{chapterInfo.flavorText}”</blockquote>
-      </section>
-
-      {/* Campaign Notes */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Campaign Notes</h2>
-        <textarea
-          className="w-full p-2 border border-gray-300 rounded resize-y min-h-[120px]"
-          placeholder="Enter campaign-wide DM notes here..."
-          value={campaignNotes}
-          onChange={(e) => setCampaignNotes(e.target.value)}
-        />
-      </section>
-
-      {/* Scene Notes */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Scene Notes</h2>
-        <textarea
-          className="w-full p-2 border border-gray-300 rounded resize-y min-h-[120px]"
-          placeholder="Enter notes for the active scene here..."
-          value={sceneNotes}
-          onChange={(e) => setSceneNotes(e.target.value)}
-        />
-      </section>
-
-      {/* Combat Notes */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Combat Notes</h2>
-        <textarea
-          className="w-full p-2 border border-gray-300 rounded resize-y min-h-[120px]"
-          placeholder="Enter notes for the active combat encounter here..."
-          value={combatNotes}
-          onChange={(e) => setCombatNotes(e.target.value)}
-        />
-      </section>
-
-      {/* PDF Upload and map extraction */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Upload Chapter PDF to Extract Maps</h2>
-        <input type="file" accept="application/pdf" onChange={handleFileChange} />
-        <button
-          onClick={uploadPdf}
-          disabled={uploading || !selectedFile}
-          className="mt-2 px-4 py-2 bg-ink text-parchment rounded hover:bg-soul transition"
-        >
-          {uploading ? 'Uploading...' : 'Upload & Extract Maps'}
-        </button>
-
-        {extractedMaps.length > 0 && (
-          <>
-            <h3 className="mt-4 font-semibold">Extracted Maps (Assign in Scene Manager)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2 max-h-96 overflow-auto">
-              {extractedMaps.map((url) => (
-                <div key={url} className="border border-ink rounded p-2">
-                  <img
-                    src={`http://localhost:4000${url}`}
-                    alt="Extracted Map"
-                    className="max-w-full max-h-48 object-contain"
-                  />
-                  <p className="text-center mt-1 text-sm truncate">{url.split('/').pop()}</p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Map Assignments List */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Map Assignments</h2>
-        {Object.keys(sceneMapAssignments).length > 0 ? (
-          <ul>
-            {Object.entries(sceneMapAssignments).map(([sceneId, mapUrl]) => (
-              <li key={sceneId} className="mb-2">
-                <strong>Scene ID:</strong> {sceneId} <br />
-                <img
-                  src={mapUrl.startsWith('http') ? mapUrl : `http://localhost:4000${mapUrl}`}
-                  alt={`Map for scene ${sceneId}`}
-                  className="max-w-xs max-h-48 object-contain border border-ink rounded mt-1"
-                />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No map assignments yet.</p>
-        )}
-      </section>
-
-      {/* Export JSON */}
-      <section className="mb-8 bg-white/80 border border-ink rounded p-4">
-        <h2 className="text-3xl font-semibold mb-3">Export DM Data as JSON</h2>
-        <button
-          onClick={() => {
-            const exportData = {
-              sceneMapAssignments,
-              campaignNotes,
-              sceneNotes,
-              combatNotes,
-              chapterInfo,
-            };
-            alert('Copy the JSON from the box below to save your data.');
-            setExportJson(JSON.stringify(exportData, null, 2));
-          }}
-          className="mb-4 px-4 py-2 bg-ink text-parchment rounded hover:bg-soul transition"
-        >
-          Generate JSON Export
-        </button>
-        {exportJson && (
-          <>
-            <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-64 whitespace-pre-wrap">{exportJson}</pre>
-            <button
-              onClick={() => setExportJson('')}
-              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Clear Export
-            </button>
-          </>
-        )}
-      </section>
-    </div>
-  );
-};
-
-export default DmModule;
+cat > "$PATCH_FILE" << 'EOF'
+diff --git a/src/pages/SceneManager.jsx b/src/pages/SceneManager.jsx
+new file mode 100644
+index 0000000..a0b3a3e
+--- /dev/null
++++ b/src/pages/SceneManager.jsx
+@@ -0,0 +1,114 @@
++import React, { useState, useEffect } from 'react';
++
++export default function SceneManager() {
++  const [scenes, setScenes] = useState([]);
++  const [maps, setMaps] = useState([]);
++  const [assignments, setAssignments] = useState({}); // sceneId => [mapIds]
++  const [uploading, setUploading] = useState(false);
++  const [dragOver, setDragOver] = useState(false);
++
++  useEffect(() => {
++    fetch('/api/scenes')
++      .then(res => res.json())
++      .then(data => {
++        setScenes(data);
++        const init = {};
++        data.forEach(scene => {
++          init[scene.id] = (scene.assignedMaps || []).map(m => m.id);
++        });
++        setAssignments(init);
++      });
++    fetch('/api/maps')
++      .then(res => res.json())
++      .then(setMaps);
++  }, []);
++
++  function onMapSelect(sceneId, selectedOptions) {
++    const selectedIds = Array.from(selectedOptions).map(o => o.value);
++    setAssignments(prev => ({ ...prev, [sceneId]: selectedIds }));
++  }
++
++  async function saveAssignments(sceneId) {
++    setUploading(true);
++    try {
++      const res = await fetch(`/api/scenes/${sceneId}/maps`, {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({ mapIds: assignments[sceneId] || [] }),
++      });
++      if (!res.ok) throw new Error('Failed to save');
++      const updatedScene = await res.json();
++      setScenes(prev =>
++        prev.map(s => (s.id === sceneId ? updatedScene : s))
++      );
++      alert('Maps saved!');
++    } catch (e) {
++      alert('Error saving maps: ' + e.message);
++    } finally {
++      setUploading(false);
++    }
++  }
++
++  async function onDrop(event) {
++    event.preventDefault();
++    setDragOver(false);
++    const files = event.dataTransfer.files;
++    if (!files.length) return;
++    await uploadPdf(files[0]);
++  }
++
++  async function uploadPdf(file) {
++    const formData = new FormData();
++    formData.append('file', file);
++    setUploading(true);
++    try {
++      const res = await fetch('/api/upload', { method: 'POST', body: formData });
++      if (!res.ok) throw new Error('Upload failed');
++      alert('PDF uploaded and maps extracted!');
++      const mapsRes = await fetch('/api/maps');
++      const newMaps = await mapsRes.json();
++      setMaps(newMaps);
++      const scenesRes = await fetch('/api/scenes');
++      const newScenes = await scenesRes.json();
++      setScenes(newScenes);
++    } catch (e) {
++      alert('Error uploading PDF: ' + e.message);
++    } finally {
++      setUploading(false);
++    }
++  }
++
++  return (
++    <div
++      onDragOver={e => {
++        e.preventDefault();
++        setDragOver(true);
++      }}
++      onDragLeave={e => {
++        e.preventDefault();
++        setDragOver(false);
++      }}
++      onDrop={onDrop}
++      style={{
++        padding: 20,
++        backgroundColor: dragOver ? '#f0f8ff' : 'transparent',
++        border: dragOver ? '2px dashed #0a74da' : '2px dashed transparent',
++        marginBottom: 20,
++      }}
++    >
++      <p>Drag & drop a chapter PDF here or use the file input below to upload and extract maps:</p>
++      <input
++        type="file"
++        accept=".pdf"
++        disabled={uploading}
++        onChange={e => e.target.files.length && uploadPdf(e.target.files[0])}
++      />
++      {uploading && <p>Uploading and extracting maps...</p>}
++
++      <h2>Scenes</h2>
++
++      {scenes.map(scene => (
++        <div
++          key={scene.id}
++          style={{
++            marginBottom: 30,
++            padding: 10,
++            border: '1px solid #ccc',
++            borderRadius: 6,
++          }}
++        >
++          <h3>{scene.name}</h3>
++          <label>
++            Assign Maps (hold Ctrl/Cmd to multi-select):
++            <br />
++            <select
++              multiple
++              size={Math.min(5, maps.length)}
++              style={{ width: '100%', marginTop: 8 }}
++              value={assignments[scene.id] || []}
++              onChange={e => onMapSelect(scene.id, e.target.selectedOptions)}
++            >
++              {maps.map(map => (
++                <option key={map.id} value={map.id}>
++                  {map.filename || map.id}
++                </option>
++              ))}
++            </select>
++          </label>
++
++          <div
++            style={{
++              marginTop: 10,
++              display: 'flex',
++              gap: 10,
++              flexWrap: 'wrap',
++            }}
++          >
++            {(assignments[scene.id] || []).map(mapId => {
++              const map = maps.find(m => m.id === mapId);
++              if (!map) return null;
++              return (
++                <img
++                  key={mapId}
++                  src={`/maps/${map.filename || map.id}`}
++                  alt={map.filename || 'map'}
++                  style={{ maxHeight: 100, border: '1px solid #aaa', borderRadius: 4 }}
++                />
++              );
++            })}
++          </div>
++
++          <button
++            onClick={() => saveAssignments(scene.id)}
++            disabled={uploading}
++            style={{
++              marginTop: 10,
++              padding: '8px 16px',
++              backgroundColor: '#0a74da',
++              color: '#fff',
++              border: 'none',
++              borderRadius: 4,
++              cursor: 'pointer',
++            }}
++          >
++            Save Maps
++          </button>
++        </div>
++      ))}
++    </div>
++  );
++}
 EOF
 
-echo "Restored PDF upload UI in DmModule.jsx with map assignment overview and JSON export."
+echo "Applying patch $PATCH_FILE..."
+git apply "$PATCH_FILE"
+echo "Patch applied successfully."
+
+rm "$PATCH_FILE"
+echo "Temporary patch file removed."
 

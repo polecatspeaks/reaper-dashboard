@@ -1,0 +1,175 @@
+import React, { useState, useEffect } from 'react';
+
+// PdfUpload component for uploading PDFs and extracting maps
+function PdfUpload({ onUploadSuccess }) {
+  const [file, setFile] = React.useState(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+    setError(null);
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      setError('Please select a PDF file first.');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    try {
+      const res = await fetch('/api/upload-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+      const data = await res.json();
+      onUploadSuccess(data.extractedMaps);
+      setFile(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '1rem' }}>
+      <input type="file" accept="application/pdf" onChange={handleFileChange} />
+      <button onClick={handleUpload} disabled={uploading}>
+        {uploading ? 'Uploading...' : 'Upload PDF'}
+      </button>
+      {error && <div style={{ color: 'red' }}>{error}</div>}
+    </div>
+  );
+}
+
+export default function SceneManager() {
+  const [maps, setMaps] = useState([]);
+  const [scenes, setScenes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        const [mapsRes, scenesRes] = await Promise.all([
+          fetch('/api/maps'),
+          fetch('/api/scenes'),
+        ]);
+        if (!mapsRes.ok || !scenesRes.ok) {
+          throw new Error('Failed to load maps or scenes');
+        }
+        const mapsData = await mapsRes.json();
+        const scenesData = await scenesRes.json();
+        setMaps(mapsData);
+        setScenes(scenesData);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const handleUploadSuccess = (newMaps) => {
+    setMaps((prev) => [...prev, ...newMaps]);
+  };
+
+  const handleAssignMaps = async (sceneId, selectedMapIds) => {
+    setAssigning(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/scenes/${sceneId}/maps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mapIds: selectedMapIds }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to assign maps');
+      }
+      const updatedScene = await res.json();
+      setScenes((prevScenes) =>
+        prevScenes.map((scene) =>
+          scene.id === sceneId ? updatedScene : scene
+        )
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  if (loading) return <div>Loading scenes and maps...</div>;
+  if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
+
+  return (
+    <div>
+      <h2>Upload Chapter PDF and Extract Maps</h2>
+      <PdfUpload onUploadSuccess={handleUploadSuccess} />
+
+      <h3>Scenes</h3>
+      {scenes.map((scene) => {
+        const assignedMapIds = (scene.assignedMaps || []).map((m) => m.id);
+        return (
+          <div
+            key={scene.id}
+            style={{
+              border: '1px solid #ccc',
+              padding: '1rem',
+              marginBottom: '1rem',
+              borderRadius: '6px',
+            }}
+          >
+            <h4>{scene.name}</h4>
+            <label>
+              Assign Maps (hold Ctrl/Cmd to multi-select):
+              <br />
+              <select
+                multiple
+                value={assignedMapIds}
+                onChange={(e) => {
+                  const selected = Array.from(
+                    e.target.selectedOptions,
+                    (option) => option.value
+                  );
+                  handleAssignMaps(scene.id, selected);
+                }}
+                disabled={assigning}
+                style={{ width: '100%', height: '6em' }}
+              >
+                {maps.map((map) => (
+                  <option key={map.id} value={map.id}>
+                    {map.filename}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {(scene.assignedMaps || []).map((map) => (
+                <img
+                  key={map.id}
+                  src={map.url}
+                  alt={map.filename}
+                  style={{ maxWidth: 120, maxHeight: 120, border: '1px solid #888' }}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

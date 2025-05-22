@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import CampaignDashboard from './pages/CampaignDashboard';
 import SceneManager from './pages/SceneManager';
 import CombatTracker from './pages/CombatTracker';
@@ -20,10 +20,8 @@ function App() {
 
         <main className="p-6">
           <Routes>
-            <Route path="/" element={<CampaignDashboard />} />
-            <Route path="/scene" element={<SceneManager />} />
-            <Route path="/combat" element={<CombatTracker />} />
-            <Route path="/dm" element={<DmModule />} />
+            <Route path="/" element={<Navigate to="/scene-manager" replace />} />
+            <Route path="/scene-manager" element={<SceneManager />} />
           </Routes>
         </main>
       </div>
@@ -32,3 +30,4 @@ function App() {
 }
 
 export default App;
+

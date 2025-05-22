@@ -1,0 +1,35 @@
+[
+  {
+    "id": "scene1",
+    "name": "Forest Encounter",
+    "assignedMaps": [
+      {
+        "id": "map-1747937501091-4",
+        "filename": "map-1747937476552-004.png",
+        "url": "/maps/map-1747937476552-004.png"
+      }
+    ]
+  },
+  {
+    "id": "scene2",
+    "name": "Castle Siege",
+    "assignedMaps": [
+      {
+        "id": "map-1747937501091-46",
+        "filename": "map-1747937476552-046.png",
+        "url": "/maps/map-1747937476552-046.png"
+      }
+    ]
+  },
+  {
+    "id": "scene3",
+    "name": "Dungeon Crawl",
+    "assignedMaps": [
+      {
+        "id": "map-1747937501091-78",
+        "filename": "map-1747937476552-078.png",
+        "url": "/maps/map-1747937476552-078.png"
+      }
+    ]
+  }
+]
